@@ -97,7 +97,10 @@ export default async function handler(req, res) {
 
   try {
 
-    // Basic health check
+    // ---------------------------------------
+    // BASIC HEALTH CHECK
+    // ---------------------------------------
+
     if (req.method === "GET" && !req.query?.test) {
       return res.status(200).json({
         success: true,
@@ -105,8 +108,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // Shopify connection test
-    if (req.method === "GET" && req.query?.test === "shopify") {
+    // ---------------------------------------
+    // SHOPIFY CONNECTION TEST
+    // ---------------------------------------
+
+    if (
+      req.method === "GET" &&
+      req.query?.test === "shopify"
+    ) {
       const data = await shopifyGraphQL(`
         query {
           shop {
@@ -132,57 +141,54 @@ export default async function handler(req, res) {
       });
     }
 
-    // Create Review Metaobject definition
+    // ---------------------------------------
+    // TEST: CREATE REVIEW
+    // ---------------------------------------
+
     if (
       req.method === "GET" &&
-      req.query?.test === "setup-reviews"
+      req.query?.test === "save-review"
     ) {
 
-      // Check if definition already exists
-      const existing = await shopifyGraphQL(`
+      // Get one product automatically
+      const productsData = await shopifyGraphQL(`
         query {
-          metaobjectDefinitionByType(type: "$app:review") {
-            id
-            name
-            type
+          products(first: 1) {
+            nodes {
+              id
+              title
+            }
           }
         }
       `);
 
-      if (existing.data.metaobjectDefinitionByType) {
-        return res.status(200).json({
-          success: true,
-          message: "Review Metaobject already exists.",
-          definition:
-            existing.data.metaobjectDefinitionByType,
+      const product =
+        productsData.data.products.nodes[0];
+
+      if (!product) {
+        return res.status(400).json({
+          success: false,
+          message: "No Shopify product found.",
         });
       }
 
-      // Create definition
-      const data = await shopifyGraphQL(
+      const now = new Date().toISOString();
+
+      const reviewData = await shopifyGraphQL(
         `
-        mutation CreateReviewDefinition(
-          $definition: MetaobjectDefinitionCreateInput!
+        mutation CreateReview(
+          $metaobject: MetaobjectCreateInput!
         ) {
-          metaobjectDefinitionCreate(
-            definition: $definition
+          metaobjectCreate(
+            metaobject: $metaobject
           ) {
-            metaobjectDefinition {
+            metaobject {
               id
-              name
+              handle
               type
-
-              access {
-                admin
-                storefront
-              }
-
-              fieldDefinitions {
-                name
+              fields {
                 key
-                type {
-                  name
-                }
+                value
               }
             }
 
@@ -195,62 +201,38 @@ export default async function handler(req, res) {
         }
         `,
         {
-          definition: {
-            name: "Customer Review",
+          metaobject: {
             type: "$app:review",
 
-            access: {
-              admin: "MERCHANT_READ_WRITE",
-              storefront: "PUBLIC_READ"
-            },
-
-            fieldDefinitions: [
+            fields: [
               {
-                name: "Product",
                 key: "product",
-                type: "product_reference"
+                value: product.id
               },
-
               {
-                name: "Customer Name",
                 key: "customer_name",
-                type: "single_line_text_field"
+                value: "Test Customer"
               },
-
               {
-                name: "Rating",
                 key: "rating",
-                type: "number_integer"
+                value: "5"
               },
-
               {
-                name: "Review",
                 key: "review",
-                type: "multi_line_text_field"
+                value:
+                  "This is a test review from the custom review system."
               },
-
               {
-                name: "Review Date",
                 key: "review_date",
-                type: "date_time"
+                value: now
               },
-
               {
-                name: "Status",
                 key: "status",
-                type: "single_line_text_field"
+                value: "pending"
               },
-
               {
-                name: "Verified Buyer",
                 key: "verified",
-                type: "boolean"
-              },
-
-              {
-                name: "Customer Photos",
-                key: "images",
-                type: "list.file_reference"
+                value: "false"
               }
             ]
           }
@@ -258,30 +240,157 @@ export default async function handler(req, res) {
       );
 
       const result =
-        data.data.metaobjectDefinitionCreate;
+        reviewData.data.metaobjectCreate;
 
       if (result.userErrors?.length) {
         return res.status(400).json({
           success: false,
-          message: "Could not create review definition.",
-          errors: result.userErrors
+          message: "Review could not be created.",
+          errors: result.userErrors,
         });
       }
 
       return res.status(200).json({
         success: true,
-        message: "Review Metaobject created successfully!",
-        definition: result.metaobjectDefinition
+        message: "Test review saved successfully!",
+        product: product,
+        review: result.metaobject,
       });
     }
 
-    // Temporary POST test
+    // ---------------------------------------
+    // REAL REVIEW SUBMISSION
+    // ---------------------------------------
+
     if (req.method === "POST") {
-      return res.status(200).json({
+
+      const body = req.body || {};
+
+      const productId = body.product_id;
+      const customerName = body.customer_name;
+      const rating = Number(body.rating);
+      const reviewText = body.review;
+
+      if (!productId) {
+        return res.status(400).json({
+          success: false,
+          message: "Product ID is required.",
+        });
+      }
+
+      if (!customerName) {
+        return res.status(400).json({
+          success: false,
+          message: "Customer name is required.",
+        });
+      }
+
+      if (
+        !Number.isInteger(rating) ||
+        rating < 1 ||
+        rating > 5
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Rating must be between 1 and 5.",
+        });
+      }
+
+      if (!reviewText) {
+        return res.status(400).json({
+          success: false,
+          message: "Review text is required.",
+        });
+      }
+
+      const now = new Date().toISOString();
+
+      const reviewData = await shopifyGraphQL(
+        `
+        mutation CreateReview(
+          $metaobject: MetaobjectCreateInput!
+        ) {
+          metaobjectCreate(
+            metaobject: $metaobject
+          ) {
+            metaobject {
+              id
+              handle
+              type
+              fields {
+                key
+                value
+              }
+            }
+
+            userErrors {
+              field
+              message
+              code
+            }
+          }
+        }
+        `,
+        {
+          metaobject: {
+            type: "$app:review",
+
+            fields: [
+              {
+                key: "product",
+                value: productId,
+              },
+              {
+                key: "customer_name",
+                value: String(customerName).trim(),
+              },
+              {
+                key: "rating",
+                value: String(rating),
+              },
+              {
+                key: "review",
+                value: String(reviewText).trim(),
+              },
+              {
+                key: "review_date",
+                value: now,
+              },
+              {
+                key: "status",
+                value: "pending",
+              },
+              {
+                key: "verified",
+                value: "false",
+              }
+            ]
+          }
+        }
+      );
+
+      const result =
+        reviewData.data.metaobjectCreate;
+
+      if (result.userErrors?.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Review could not be saved.",
+          errors: result.userErrors,
+        });
+      }
+
+      return res.status(201).json({
         success: true,
-        message: "Review endpoint is ready.",
+        message:
+          "Review submitted successfully and is awaiting approval.",
+        review: result.metaobject,
       });
     }
+
+    // ---------------------------------------
+    // METHOD NOT ALLOWED
+    // ---------------------------------------
 
     return res.status(405).json({
       success: false,
