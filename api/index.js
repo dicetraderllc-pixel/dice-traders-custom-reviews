@@ -318,7 +318,184 @@ export default async function handler(req, res) {
         target: result.stagedTargets[0]
       });
     }
+// ---------------------------------------
+// TEST: ACTUAL IMAGE UPLOAD
+// ---------------------------------------
 
+if (
+  req.method === "GET" &&
+  req.query?.test === "image-upload"
+) {
+
+  // Tiny 1x1 PNG test image
+  const imageBase64 =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+  const imageBuffer = Buffer.from(
+    imageBase64,
+    "base64"
+  );
+
+  const filename = "customer-review-test.png";
+  const mimeType = "image/png";
+
+  // ---------------------------------------
+  // 1. CREATE STAGED UPLOAD TARGET
+  // ---------------------------------------
+
+  const uploadData = await shopifyGraphQL(
+    `
+    mutation CreateUploadTarget(
+      $input: [StagedUploadInput!]!
+    ) {
+      stagedUploadsCreate(input: $input) {
+        stagedTargets {
+          url
+          resourceUrl
+          parameters {
+            name
+            value
+          }
+        }
+
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+    `,
+    {
+      input: [
+        {
+          filename: filename,
+          mimeType: mimeType,
+          httpMethod: "POST",
+          resource: "FILE"
+        }
+      ]
+    }
+  );
+
+  const uploadResult =
+    uploadData.data.stagedUploadsCreate;
+
+  if (uploadResult.userErrors?.length) {
+    return res.status(400).json({
+      success: false,
+      message: "Could not create upload target.",
+      errors: uploadResult.userErrors
+    });
+  }
+
+  const target =
+    uploadResult.stagedTargets[0];
+
+  // ---------------------------------------
+  // 2. UPLOAD IMAGE TO SHOPIFY
+  // ---------------------------------------
+
+  const formData = new FormData();
+
+  for (const parameter of target.parameters) {
+    formData.append(
+      parameter.name,
+      parameter.value
+    );
+  }
+
+  const imageBlob = new Blob(
+    [imageBuffer],
+    {
+      type: mimeType
+    }
+  );
+
+  formData.append(
+    "file",
+    imageBlob,
+    filename
+  );
+
+  const uploadResponse = await fetch(
+    target.url,
+    {
+      method: "POST",
+      body: formData
+    }
+  );
+
+  if (!uploadResponse.ok) {
+    const uploadError =
+      await uploadResponse.text();
+
+    throw new Error(
+      `Shopify file upload failed: ${uploadResponse.status} ${uploadError}`
+    );
+  }
+
+  // ---------------------------------------
+  // 3. CREATE SHOPIFY FILE
+  // ---------------------------------------
+
+  const fileData = await shopifyGraphQL(
+    `
+    mutation CreateFile(
+      $files: [FileCreateInput!]!
+    ) {
+      fileCreate(
+        files: $files
+      ) {
+        files {
+          id
+          fileStatus
+          alt
+          createdAt
+
+          ... on MediaImage {
+            image {
+              width
+              height
+            }
+          }
+        }
+
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+    `,
+    {
+      files: [
+        {
+          alt: "Customer review test image",
+          contentType: "IMAGE",
+          originalSource: target.resourceUrl
+        }
+      ]
+    }
+  );
+
+  const fileResult =
+    fileData.data.fileCreate;
+
+  if (fileResult.userErrors?.length) {
+    return res.status(400).json({
+      success: false,
+      message: "Shopify file could not be created.",
+      errors: fileResult.userErrors
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message:
+      "Customer review image uploaded successfully!",
+    file: fileResult.files[0]
+  });
+}
     // ---------------------------------------
     // REAL REVIEW SUBMISSION
     // ---------------------------------------
