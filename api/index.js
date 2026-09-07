@@ -150,7 +150,6 @@ export default async function handler(req, res) {
       req.query?.test === "save-review"
     ) {
 
-      // Get one product automatically
       const productsData = await shopifyGraphQL(`
         query {
           products(first: 1) {
@@ -255,6 +254,69 @@ export default async function handler(req, res) {
         message: "Test review saved successfully!",
         product: product,
         review: result.metaobject,
+      });
+    }
+
+    // ---------------------------------------
+    // TEST: IMAGE UPLOAD TARGET
+    // ---------------------------------------
+
+    if (
+      req.method === "GET" &&
+      req.query?.test === "upload-target"
+    ) {
+
+      const uploadData = await shopifyGraphQL(
+        `
+        mutation CreateUploadTarget(
+          $input: [StagedUploadInput!]!
+        ) {
+          stagedUploadsCreate(input: $input) {
+            stagedTargets {
+              url
+              resourceUrl
+              parameters {
+                name
+                value
+              }
+            }
+
+            userErrors {
+              field
+              message
+              code
+            }
+          }
+        }
+        `,
+        {
+          input: [
+            {
+              filename: "customer-review-test.jpg",
+              mimeType: "image/jpeg",
+              httpMethod: "POST",
+              resource: "FILE"
+            }
+          ]
+        }
+      );
+
+      const result =
+        uploadData.data.stagedUploadsCreate;
+
+      if (result.userErrors?.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Could not create upload target.",
+          errors: result.userErrors
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Shopify image upload target created successfully!",
+        target: result.stagedTargets[0]
       });
     }
 
