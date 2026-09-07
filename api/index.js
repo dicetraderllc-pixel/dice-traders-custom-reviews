@@ -12,13 +12,14 @@ function getShopDomain() {
 async function getShopifyAccessToken() {
   const clientId = process.env.SHOPIFY_CLIENT_ID;
   const clientSecret = process.env.SHOPIFY_CLIENT_SECRET;
+  const shopDomain = getShopDomain();
 
   if (!clientId || !clientSecret) {
     throw new Error("Shopify credentials are missing.");
   }
 
   const response = await fetch(
-    "https://api.shopify.com/auth/access_token",
+    `https://${shopDomain}/admin/oauth/access_token`,
     {
       method: "POST",
       headers: {
