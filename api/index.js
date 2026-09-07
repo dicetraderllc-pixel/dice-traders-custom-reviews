@@ -529,7 +529,134 @@ export default async function handler(req, res) {
 
       });
     }
+// =========================================
+// REVIEW MODERATION
+// =========================================
 
+if (
+  req.method === "POST" &&
+  req.query?.action === "update-status"
+) {
+
+  const body = req.body || {};
+
+  const reviewId = String(
+    body.review_id || ""
+  ).trim();
+
+  const status = String(
+    body.status || ""
+  ).trim().toLowerCase();
+
+
+  // ---------------------------------------
+  // VALIDATION
+  // ---------------------------------------
+
+  if (!reviewId) {
+    return res.status(400).json({
+      success: false,
+      message: "Review ID is required."
+    });
+  }
+
+  if (
+    status !== "approved" &&
+    status !== "rejected" &&
+    status !== "pending"
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Status must be approved, rejected, or pending."
+    });
+  }
+
+
+  // ---------------------------------------
+  // UPDATE SHOPIFY METAOBJECT
+  // ---------------------------------------
+
+  const updateData = await shopifyGraphQL(
+    `
+      mutation UpdateReviewStatus(
+        $id: ID!,
+        $metaobject: MetaobjectUpdateInput!
+      ) {
+
+        metaobjectUpdate(
+          id: $id,
+          metaobject: $metaobject
+        ) {
+
+          metaobject {
+            id
+            handle
+
+            field(key: "status") {
+              value
+            }
+          }
+
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `,
+    {
+      id: reviewId,
+
+      metaobject: {
+        fields: [
+          {
+            key: "status",
+            value: status
+          }
+        ]
+      }
+    }
+  );
+
+
+  const result =
+    updateData.data.metaobjectUpdate;
+
+
+  // ---------------------------------------
+  // SHOPIFY ERRORS
+  // ---------------------------------------
+
+  if (result.userErrors?.length) {
+
+    return res.status(400).json({
+      success: false,
+      message:
+        "Could not update review status.",
+      errors:
+        result.userErrors
+    });
+
+  }
+
+
+  // ---------------------------------------
+  // SUCCESS
+  // ---------------------------------------
+
+  return res.status(200).json({
+
+    success: true,
+
+    message:
+      `Review ${status} successfully.`,
+
+    review:
+      result.metaobject
+
+  });
+}
 
     // =========================================
     // METHOD NOT ALLOWED
