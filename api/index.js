@@ -97,9 +97,9 @@ export default async function handler(req, res) {
 
   try {
 
-    // ---------------------------------------
+    // =========================================
     // BASIC HEALTH CHECK
-    // ---------------------------------------
+    // =========================================
 
     if (req.method === "GET" && !req.query?.test) {
       return res.status(200).json({
@@ -108,14 +108,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // ---------------------------------------
+
+    // =========================================
     // SHOPIFY CONNECTION TEST
-    // ---------------------------------------
+    // =========================================
 
     if (
       req.method === "GET" &&
       req.query?.test === "shopify"
     ) {
+
       const data = await shopifyGraphQL(`
         query {
           shop {
@@ -141,9 +143,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // ---------------------------------------
+
+    // =========================================
     // TEST: CREATE REVIEW
-    // ---------------------------------------
+    // =========================================
 
     if (
       req.method === "GET" &&
@@ -185,6 +188,7 @@ export default async function handler(req, res) {
               id
               handle
               type
+
               fields {
                 key
                 value
@@ -257,9 +261,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // ---------------------------------------
+
+    // =========================================
     // TEST: IMAGE UPLOAD TARGET
-    // ---------------------------------------
+    // =========================================
 
     if (
       req.method === "GET" &&
@@ -272,9 +277,11 @@ export default async function handler(req, res) {
           $input: [StagedUploadInput!]!
         ) {
           stagedUploadsCreate(input: $input) {
+
             stagedTargets {
               url
               resourceUrl
+
               parameters {
                 name
                 value
@@ -318,208 +325,440 @@ export default async function handler(req, res) {
         target: result.stagedTargets[0]
       });
     }
-// ---------------------------------------
-// TEST: ACTUAL IMAGE UPLOAD
-// ---------------------------------------
 
-if (
-  req.method === "GET" &&
-  req.query?.test === "image-upload"
-) {
 
-  // Tiny 1x1 PNG test image
-  const imageBase64 =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+    // =========================================
+    // TEST: IMAGE + REVIEW
+    // =========================================
 
-  const imageBuffer = Buffer.from(
-    imageBase64,
-    "base64"
-  );
-
-  const filename = "customer-review-test.png";
-  const mimeType = "image/png";
-
-  // ---------------------------------------
-  // 1. CREATE STAGED UPLOAD TARGET
-  // ---------------------------------------
-
-  const uploadData = await shopifyGraphQL(
-    `
-    mutation CreateUploadTarget(
-      $input: [StagedUploadInput!]!
+    if (
+      req.method === "GET" &&
+      req.query?.test === "image-review"
     ) {
-      stagedUploadsCreate(input: $input) {
-        stagedTargets {
-          url
-          resourceUrl
-          parameters {
-            name
-            value
-          }
-        }
 
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-    `,
-    {
-      input: [
-        {
-          filename: filename,
-          mimeType: mimeType,
-          httpMethod: "POST",
-          resource: "FILE"
-        }
-      ]
-    }
-  );
+      // ---------------------------------------
+      // 1. CREATE TEST IMAGE
+      // ---------------------------------------
 
-  const uploadResult =
-    uploadData.data.stagedUploadsCreate;
+      const imageBase64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
-  if (uploadResult.userErrors?.length) {
-    return res.status(400).json({
-      success: false,
-      message: "Could not create upload target.",
-      errors: uploadResult.userErrors
-    });
-  }
+      const imageBuffer = Buffer.from(
+        imageBase64,
+        "base64"
+      );
 
-  const target =
-    uploadResult.stagedTargets[0];
+      const filename =
+        "customer-review-with-photo.png";
 
-  // ---------------------------------------
-  // 2. UPLOAD IMAGE TO SHOPIFY
-  // ---------------------------------------
+      const mimeType =
+        "image/png";
 
-  const formData = new FormData();
 
-  for (const parameter of target.parameters) {
-    formData.append(
-      parameter.name,
-      parameter.value
-    );
-  }
+      // ---------------------------------------
+      // 2. CREATE STAGED UPLOAD TARGET
+      // ---------------------------------------
 
-  const imageBlob = new Blob(
-    [imageBuffer],
-    {
-      type: mimeType
-    }
-  );
+      const uploadData = await shopifyGraphQL(
+        `
+        mutation CreateUploadTarget(
+          $input: [StagedUploadInput!]!
+        ) {
+          stagedUploadsCreate(input: $input) {
 
-  formData.append(
-    "file",
-    imageBlob,
-    filename
-  );
+            stagedTargets {
+              url
+              resourceUrl
 
-  const uploadResponse = await fetch(
-    target.url,
-    {
-      method: "POST",
-      body: formData
-    }
-  );
+              parameters {
+                name
+                value
+              }
+            }
 
-  if (!uploadResponse.ok) {
-    const uploadError =
-      await uploadResponse.text();
-
-    throw new Error(
-      `Shopify file upload failed: ${uploadResponse.status} ${uploadError}`
-    );
-  }
-
-  // ---------------------------------------
-  // 3. CREATE SHOPIFY FILE
-  // ---------------------------------------
-
-  const fileData = await shopifyGraphQL(
-    `
-    mutation CreateFile(
-      $files: [FileCreateInput!]!
-    ) {
-      fileCreate(
-        files: $files
-      ) {
-        files {
-          id
-          fileStatus
-          alt
-          createdAt
-
-          ... on MediaImage {
-            image {
-              width
-              height
+            userErrors {
+              field
+              message
             }
           }
         }
-
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-    `,
-    {
-      files: [
+        `,
         {
-          alt: "Customer review test image",
-          contentType: "IMAGE",
-          originalSource: target.resourceUrl
+          input: [
+            {
+              filename: filename,
+              mimeType: mimeType,
+              httpMethod: "POST",
+              resource: "FILE"
+            }
+          ]
         }
-      ]
+      );
+
+      const uploadResult =
+        uploadData.data.stagedUploadsCreate;
+
+      if (uploadResult.userErrors?.length) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Could not create upload target.",
+          errors:
+            uploadResult.userErrors
+        });
+      }
+
+      const target =
+        uploadResult.stagedTargets[0];
+
+
+      // ---------------------------------------
+      // 3. UPLOAD IMAGE
+      // ---------------------------------------
+
+      const formData = new FormData();
+
+      for (const parameter of target.parameters) {
+
+        formData.append(
+          parameter.name,
+          parameter.value
+        );
+      }
+
+      const imageBlob = new Blob(
+        [imageBuffer],
+        {
+          type: mimeType
+        }
+      );
+
+      formData.append(
+        "file",
+        imageBlob,
+        filename
+      );
+
+      const uploadResponse =
+        await fetch(
+          target.url,
+          {
+            method: "POST",
+            body: formData
+          }
+        );
+
+      if (!uploadResponse.ok) {
+
+        const uploadError =
+          await uploadResponse.text();
+
+        throw new Error(
+          `Shopify image upload failed: ${uploadResponse.status} ${uploadError}`
+        );
+      }
+
+
+      // ---------------------------------------
+      // 4. CREATE SHOPIFY FILE
+      // ---------------------------------------
+
+      const fileData =
+        await shopifyGraphQL(
+          `
+          mutation CreateFile(
+            $files: [FileCreateInput!]!
+          ) {
+
+            fileCreate(
+              files: $files
+            ) {
+
+              files {
+                id
+                fileStatus
+                alt
+                createdAt
+              }
+
+              userErrors {
+                field
+                message
+              }
+            }
+          }
+          `,
+          {
+            files: [
+              {
+                alt:
+                  "Customer review test photo",
+
+                contentType:
+                  "IMAGE",
+
+                originalSource:
+                  target.resourceUrl
+              }
+            ]
+          }
+        );
+
+      const fileResult =
+        fileData.data.fileCreate;
+
+      if (fileResult.userErrors?.length) {
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "Shopify file could not be created.",
+          errors:
+            fileResult.userErrors
+        });
+      }
+
+      const uploadedFile =
+        fileResult.files[0];
+
+
+      // ---------------------------------------
+      // 5. GET TEST PRODUCT
+      // ---------------------------------------
+
+      const productsData =
+        await shopifyGraphQL(`
+          query {
+            products(first: 1) {
+              nodes {
+                id
+                title
+              }
+            }
+          }
+        `);
+
+      const product =
+        productsData.data.products.nodes[0];
+
+      if (!product) {
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "No Shopify product found."
+        });
+      }
+
+
+      // ---------------------------------------
+      // 6. CREATE REVIEW WITH IMAGE
+      // ---------------------------------------
+
+      const now =
+        new Date().toISOString();
+
+      const reviewData =
+        await shopifyGraphQL(
+          `
+          mutation CreateReview(
+            $metaobject: MetaobjectCreateInput!
+          ) {
+
+            metaobjectCreate(
+              metaobject: $metaobject
+            ) {
+
+              metaobject {
+                id
+                handle
+                type
+
+                fields {
+                  key
+                  value
+                }
+              }
+
+              userErrors {
+                field
+                message
+                code
+              }
+            }
+          }
+          `,
+          {
+            metaobject: {
+
+              type:
+                "$app:review",
+
+              fields: [
+
+                {
+                  key:
+                    "product",
+
+                  value:
+                    product.id
+                },
+
+                {
+                  key:
+                    "customer_name",
+
+                  value:
+                    "Photo Test Customer"
+                },
+
+                {
+                  key:
+                    "rating",
+
+                  value:
+                    "5"
+                },
+
+                {
+                  key:
+                    "review",
+
+                  value:
+                    "This test review includes a customer photo."
+                },
+
+                {
+                  key:
+                    "review_date",
+
+                  value:
+                    now
+                },
+
+                {
+                  key:
+                    "status",
+
+                  value:
+                    "pending"
+                },
+
+                {
+                  key:
+                    "verified",
+
+                  value:
+                    "false"
+                },
+
+                {
+                  key:
+                    "images",
+
+                  value:
+                    JSON.stringify([
+                      uploadedFile.id
+                    ])
+                }
+
+              ]
+            }
+          }
+        );
+
+
+      // ---------------------------------------
+      // 7. CHECK REVIEW RESULT
+      // ---------------------------------------
+
+      const reviewResult =
+        reviewData.data.metaobjectCreate;
+
+      if (reviewResult.userErrors?.length) {
+
+        return res.status(400).json({
+
+          success: false,
+
+          message:
+            "Review could not be created with photo.",
+
+          errors:
+            reviewResult.userErrors,
+
+          file:
+            uploadedFile
+
+        });
+      }
+
+
+      // ---------------------------------------
+      // 8. SUCCESS
+      // ---------------------------------------
+
+      return res.status(200).json({
+
+        success: true,
+
+        message:
+          "Image uploaded and attached to review successfully!",
+
+        product:
+          product,
+
+        file:
+          uploadedFile,
+
+        review:
+          reviewResult.metaobject
+
+      });
     }
-  );
 
-  const fileResult =
-    fileData.data.fileCreate;
 
-  if (fileResult.userErrors?.length) {
-    return res.status(400).json({
-      success: false,
-      message: "Shopify file could not be created.",
-      errors: fileResult.userErrors
-    });
-  }
-
-  return res.status(200).json({
-    success: true,
-    message:
-      "Customer review image uploaded successfully!",
-    file: fileResult.files[0]
-  });
-}
-    // ---------------------------------------
+    // =========================================
     // REAL REVIEW SUBMISSION
-    // ---------------------------------------
+    // =========================================
 
     if (req.method === "POST") {
 
-      const body = req.body || {};
+      const body =
+        req.body || {};
 
-      const productId = body.product_id;
-      const customerName = body.customer_name;
-      const rating = Number(body.rating);
-      const reviewText = body.review;
+      const productId =
+        body.product_id;
+
+      const customerName =
+        body.customer_name;
+
+      const rating =
+        Number(body.rating);
+
+      const reviewText =
+        body.review;
+
+
+      // ---------------------------------------
+      // VALIDATION
+      // ---------------------------------------
 
       if (!productId) {
+
         return res.status(400).json({
           success: false,
-          message: "Product ID is required.",
+          message:
+            "Product ID is required.",
         });
       }
 
       if (!customerName) {
+
         return res.status(400).json({
           success: false,
-          message: "Customer name is required.",
+          message:
+            "Customer name is required.",
         });
       }
 
@@ -528,111 +767,176 @@ if (
         rating < 1 ||
         rating > 5
       ) {
+
         return res.status(400).json({
           success: false,
-          message: "Rating must be between 1 and 5.",
+          message:
+            "Rating must be between 1 and 5.",
         });
       }
 
       if (!reviewText) {
+
         return res.status(400).json({
           success: false,
-          message: "Review text is required.",
+          message:
+            "Review text is required.",
         });
       }
 
-      const now = new Date().toISOString();
 
-      const reviewData = await shopifyGraphQL(
-        `
-        mutation CreateReview(
-          $metaobject: MetaobjectCreateInput!
-        ) {
-          metaobjectCreate(
-            metaobject: $metaobject
+      // ---------------------------------------
+      // CREATE REVIEW
+      // ---------------------------------------
+
+      const now =
+        new Date().toISOString();
+
+      const reviewData =
+        await shopifyGraphQL(
+          `
+          mutation CreateReview(
+            $metaobject: MetaobjectCreateInput!
           ) {
-            metaobject {
-              id
-              handle
-              type
-              fields {
-                key
-                value
+
+            metaobjectCreate(
+              metaobject: $metaobject
+            ) {
+
+              metaobject {
+                id
+                handle
+                type
+
+                fields {
+                  key
+                  value
+                }
+              }
+
+              userErrors {
+                field
+                message
+                code
               }
             }
+          }
+          `,
+          {
+            metaobject: {
 
-            userErrors {
-              field
-              message
-              code
+              type:
+                "$app:review",
+
+              fields: [
+
+                {
+                  key:
+                    "product",
+
+                  value:
+                    productId,
+                },
+
+                {
+                  key:
+                    "customer_name",
+
+                  value:
+                    String(customerName).trim(),
+                },
+
+                {
+                  key:
+                    "rating",
+
+                  value:
+                    String(rating),
+                },
+
+                {
+                  key:
+                    "review",
+
+                  value:
+                    String(reviewText).trim(),
+                },
+
+                {
+                  key:
+                    "review_date",
+
+                  value:
+                    now,
+                },
+
+                {
+                  key:
+                    "status",
+
+                  value:
+                    "pending",
+                },
+
+                {
+                  key:
+                    "verified",
+
+                  value:
+                    "false",
+                }
+
+              ]
             }
           }
-        }
-        `,
-        {
-          metaobject: {
-            type: "$app:review",
+        );
 
-            fields: [
-              {
-                key: "product",
-                value: productId,
-              },
-              {
-                key: "customer_name",
-                value: String(customerName).trim(),
-              },
-              {
-                key: "rating",
-                value: String(rating),
-              },
-              {
-                key: "review",
-                value: String(reviewText).trim(),
-              },
-              {
-                key: "review_date",
-                value: now,
-              },
-              {
-                key: "status",
-                value: "pending",
-              },
-              {
-                key: "verified",
-                value: "false",
-              }
-            ]
-          }
-        }
-      );
 
       const result =
         reviewData.data.metaobjectCreate;
 
+
       if (result.userErrors?.length) {
+
         return res.status(400).json({
+
           success: false,
-          message: "Review could not be saved.",
-          errors: result.userErrors,
+
+          message:
+            "Review could not be saved.",
+
+          errors:
+            result.userErrors,
+
         });
       }
 
+
       return res.status(201).json({
+
         success: true,
+
         message:
           "Review submitted successfully and is awaiting approval.",
-        review: result.metaobject,
+
+        review:
+          result.metaobject,
+
       });
     }
 
-    // ---------------------------------------
+
+    // =========================================
     // METHOD NOT ALLOWED
-    // ---------------------------------------
+    // =========================================
 
     return res.status(405).json({
+
       success: false,
-      message: "Method not allowed.",
+
+      message:
+        "Method not allowed.",
+
     });
 
   } catch (error) {
@@ -640,8 +944,13 @@ if (
     console.error(error);
 
     return res.status(500).json({
+
       success: false,
-      message: error.message || "Server error.",
+
+      message:
+        error.message ||
+        "Server error.",
+
     });
   }
 }
