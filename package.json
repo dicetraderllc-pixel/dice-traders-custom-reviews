@@ -1,0 +1,14 @@
+{
+  "name": "dice-traders-custom-reviews",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Custom review system for Dice Traders Shopify store",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js"
+  },
+  "dependencies": {
+    "@shopify/shopify-api": "^12.2.0",
+    "@vercel/node": "^5.5.0"
+  }
+}
