@@ -96,7 +96,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Basic API health check
+
+    // Basic health check
     if (req.method === "GET" && !req.query?.test) {
       return res.status(200).json({
         success: true,
@@ -131,6 +132,149 @@ export default async function handler(req, res) {
       });
     }
 
+    // Create Review Metaobject definition
+    if (
+      req.method === "GET" &&
+      req.query?.test === "setup-reviews"
+    ) {
+
+      // Check if definition already exists
+      const existing = await shopifyGraphQL(`
+        query {
+          metaobjectDefinitionByType(type: "$app:review") {
+            id
+            name
+            type
+          }
+        }
+      `);
+
+      if (existing.data.metaobjectDefinitionByType) {
+        return res.status(200).json({
+          success: true,
+          message: "Review Metaobject already exists.",
+          definition:
+            existing.data.metaobjectDefinitionByType,
+        });
+      }
+
+      // Create definition
+      const data = await shopifyGraphQL(
+        `
+        mutation CreateReviewDefinition(
+          $definition: MetaobjectDefinitionCreateInput!
+        ) {
+          metaobjectDefinitionCreate(
+            definition: $definition
+          ) {
+            metaobjectDefinition {
+              id
+              name
+              type
+
+              access {
+                admin
+                storefront
+              }
+
+              fieldDefinitions {
+                name
+                key
+                type {
+                  name
+                }
+              }
+            }
+
+            userErrors {
+              field
+              message
+              code
+            }
+          }
+        }
+        `,
+        {
+          definition: {
+            name: "Customer Review",
+            type: "$app:review",
+
+            access: {
+              admin: "MERCHANT_READ_WRITE",
+              storefront: "PUBLIC_READ"
+            },
+
+            fieldDefinitions: [
+              {
+                name: "Product",
+                key: "product",
+                type: "product_reference"
+              },
+
+              {
+                name: "Customer Name",
+                key: "customer_name",
+                type: "single_line_text_field"
+              },
+
+              {
+                name: "Rating",
+                key: "rating",
+                type: "number_integer"
+              },
+
+              {
+                name: "Review",
+                key: "review",
+                type: "multi_line_text_field"
+              },
+
+              {
+                name: "Review Date",
+                key: "review_date",
+                type: "date_time"
+              },
+
+              {
+                name: "Status",
+                key: "status",
+                type: "single_line_text_field"
+              },
+
+              {
+                name: "Verified Buyer",
+                key: "verified",
+                type: "boolean"
+              },
+
+              {
+                name: "Customer Photos",
+                key: "images",
+                type: "list.file_reference"
+              }
+            ]
+          }
+        }
+      );
+
+      const result =
+        data.data.metaobjectDefinitionCreate;
+
+      if (result.userErrors?.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Could not create review definition.",
+          errors: result.userErrors
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Review Metaobject created successfully!",
+        definition: result.metaobjectDefinition
+      });
+    }
+
     // Temporary POST test
     if (req.method === "POST") {
       return res.status(200).json({
@@ -143,7 +287,9 @@ export default async function handler(req, res) {
       success: false,
       message: "Method not allowed.",
     });
+
   } catch (error) {
+
     console.error(error);
 
     return res.status(500).json({
