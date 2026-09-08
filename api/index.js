@@ -529,6 +529,87 @@ export default async function handler(req, res) {
 
       });
     }
+    // =========================================
+// GET REVIEWS FOR ADMIN
+// =========================================
+
+if (
+  req.method === "GET" &&
+  req.query?.action === "admin-reviews"
+) {
+
+  // ---------------------------------------
+  // ADMIN AUTHENTICATION
+  // ---------------------------------------
+
+  const adminKey = req.headers["x-admin-key"];
+
+  if (
+    !adminKey ||
+    adminKey !== process.env.ADMIN_KEY
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized."
+    });
+  }
+
+  // ---------------------------------------
+  // GET REVIEWS
+  // ---------------------------------------
+
+  const reviewData = await shopifyGraphQL(`
+    query GetCustomerReviews {
+      metaobjects(
+        type: "$app:review"
+        first: 100
+      ) {
+        nodes {
+          id
+          handle
+          type
+          fields {
+            key
+            value
+          }
+        }
+      }
+    }
+  `);
+
+  const reviews =
+    reviewData.data.metaobjects.nodes.map(
+      function(review) {
+
+        const fields = {};
+
+        review.fields.forEach(
+          function(field) {
+            fields[field.key] = field.value;
+          }
+        );
+
+        return {
+          id: review.id,
+          handle: review.handle,
+          product_id: fields.product || "",
+          customer_name: fields.customer_name || "",
+          rating: Number(fields.rating || 0),
+          review: fields.review || "",
+          review_date: fields.review_date || "",
+          status: fields.status || "pending",
+          verified:
+            fields.verified === "true"
+        };
+
+      }
+    );
+
+  return res.status(200).json({
+    success: true,
+    reviews: reviews
+  });
+}
 // =========================================
 // REVIEW MODERATION
 // =========================================
