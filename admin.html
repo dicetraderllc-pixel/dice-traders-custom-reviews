@@ -391,7 +391,11 @@
         ).style.display = "block";
 
 
-        renderReviews(data.reviews);
+        renderReviews(
+  Array.isArray(data.reviews)
+    ? data.reviews
+    : []
+);
 
 
         message.textContent = "";
