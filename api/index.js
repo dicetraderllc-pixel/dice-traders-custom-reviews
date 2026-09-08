@@ -957,6 +957,110 @@ if (
 
   });
 }
+    // =========================================
+// UPDATE VERIFICATION
+// =========================================
+
+if (
+  req.method === "POST" &&
+  req.query?.action === "update-verified"
+) {
+
+  const body = req.body || {};
+
+  // ADMIN AUTHENTICATION
+  const adminKey = req.headers["x-admin-key"];
+
+  if (
+    !adminKey ||
+    adminKey !== process.env.ADMIN_KEY
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized."
+    });
+  }
+
+  const reviewId = String(
+    body.review_id || ""
+  ).trim();
+
+  const verified =
+    body.verified === true;
+
+  if (!reviewId) {
+    return res.status(400).json({
+      success: false,
+      message: "Review ID is required."
+    });
+  }
+
+  const updateData =
+    await shopifyGraphQL(
+      `
+      mutation UpdateReviewVerified(
+        $id: ID!,
+        $metaobject: MetaobjectUpdateInput!
+      ) {
+
+        metaobjectUpdate(
+          id: $id,
+          metaobject: $metaobject
+        ) {
+
+          metaobject {
+            id
+            handle
+
+            field(key: "verified") {
+              value
+            }
+          }
+
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+      `,
+      {
+        id: reviewId,
+
+        metaobject: {
+          fields: [
+            {
+              key: "verified",
+              value: verified ? "true" : "false"
+            }
+          ]
+        }
+      }
+    );
+
+  const result =
+    updateData.data.metaobjectUpdate;
+
+  if (result.userErrors?.length) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Could not update verification.",
+      errors:
+        result.userErrors
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    message:
+      verified
+        ? "Review marked as Verified Buyer."
+        : "Review marked as Not Verified.",
+    review:
+      result.metaobject
+  });
+}
 
     // =========================================
     // METHOD NOT ALLOWED
