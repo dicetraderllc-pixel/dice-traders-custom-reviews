@@ -533,7 +533,7 @@ export default async function handler(req, res) {
 
       });
     }
-    // =========================================
+// =========================================
 // GET APPROVED REVIEWS FOR STOREFRONT
 // =========================================
 
@@ -541,6 +541,7 @@ if (
   req.method === "GET" &&
   req.query?.action === "storefront-reviews"
 ) {
+
   const productId = String(
     req.query?.product_id || ""
   ).trim();
@@ -551,6 +552,10 @@ if (
       message: "Product ID is required."
     });
   }
+
+  // -----------------------------------------
+  // GET ALL REVIEW METAOBJECTS
+  // -----------------------------------------
 
   const reviewData = await shopifyGraphQL(`
     query GetStorefrontReviews {
@@ -569,14 +574,29 @@ if (
     }
   `);
 
+  // -----------------------------------------
+  // BUILD REVIEW DATA
+  // -----------------------------------------
+
   const reviews =
     reviewData.data.metaobjects.nodes
       .map(function(review) {
+
         const fields = {};
 
         review.fields.forEach(function(field) {
           fields[field.key] = field.value;
         });
+
+        let images = [];
+
+        if (fields.images) {
+          try {
+            images = JSON.parse(fields.images);
+          } catch (error) {
+            images = [];
+          }
+        }
 
         return {
           id: review.id,
@@ -587,22 +607,129 @@ if (
           review_date: fields.review_date || "",
           status: fields.status || "pending",
           verified: fields.verified === "true",
-          images: fields.images
-            ? JSON.parse(fields.images)
-            : []
+          images: images
         };
+
       })
       .filter(function(review) {
+
         return (
           review.product_id === productId &&
           review.status === "approved"
         );
+
       });
+
+  // -----------------------------------------
+  // COLLECT IMAGE IDS
+  // -----------------------------------------
+
+  const imageIds = [];
+
+  reviews.forEach(function(review) {
+
+    if (!Array.isArray(review.images)) {
+      return;
+    }
+
+    review.images.forEach(function(imageId) {
+
+      if (
+        imageId &&
+        !imageIds.includes(imageId)
+      ) {
+        imageIds.push(imageId);
+      }
+
+    });
+
+  });
+
+  // -----------------------------------------
+  // GET REAL IMAGE URLs FROM SHOPIFY
+  // -----------------------------------------
+
+  const imageMap = {};
+
+  if (imageIds.length) {
+
+    const imageData = await shopifyGraphQL(
+      `
+      query GetReviewImages(
+        $ids: [ID!]!
+      ) {
+        nodes(ids: $ids) {
+
+          id
+
+          ... on MediaImage {
+            image {
+              url
+              altText
+              width
+              height
+            }
+          }
+
+        }
+      }
+      `,
+      {
+        ids: imageIds
+      }
+    );
+
+    const imageNodes =
+      imageData.data.nodes || [];
+
+    imageNodes.forEach(function(node) {
+
+      if (
+        node &&
+        node.id &&
+        node.image &&
+        node.image.url
+      ) {
+
+        imageMap[node.id] = {
+          url: node.image.url,
+          alt: node.image.altText || "",
+          width: node.image.width || null,
+          height: node.image.height || null
+        };
+
+      }
+
+    });
+
+  }
+
+  // -----------------------------------------
+  // REPLACE IMAGE IDS WITH IMAGE OBJECTS
+  // -----------------------------------------
+
+  reviews.forEach(function(review) {
+
+    review.images =
+      Array.isArray(review.images)
+        ? review.images
+            .map(function(imageId) {
+              return imageMap[imageId] || null;
+            })
+            .filter(Boolean)
+        : [];
+
+  });
+
+  // -----------------------------------------
+  // RETURN APPROVED REVIEWS
+  // -----------------------------------------
 
   return res.status(200).json({
     success: true,
     reviews: reviews
   });
+
 }
     // =========================================
 // GET REVIEWS FOR ADMIN
