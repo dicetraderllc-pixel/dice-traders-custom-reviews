@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Dice Traders - Review Admin</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f6f7f9;
+      color: #222;
+    }
+
+    .header {
+      background: #111;
+      color: #fff;
+      padding: 20px 30px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 30px auto;
+      padding: 0 20px;
+    }
+
+    .login-box,
+    .dashboard {
+      background: #fff;
+      border-radius: 10px;
+      padding: 25px;
+      box-shadow: 0 3px 15px rgba(0,0,0,.06);
+    }
+
+    .login-box {
+      max-width: 450px;
+      margin: 70px auto;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .login-button {
+      width: 100%;
+      background: #111;
+      color: #fff;
+      margin-top: 8px;
+    }
+
+    .stats {
+      display: flex;
+      gap: 15px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 15px 20px;
+      min-width: 140px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .review {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 15px;
+    }
+
+    .review-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .customer {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .date {
+      color: #777;
+      font-size: 13px;
+    }
+
+    .stars {
+      color: #e87922;
+      font-size: 20px;
+      margin: 10px 0;
+    }
+
+    .review-text {
+      line-height: 1.6;
+      margin: 10px 0;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .pending {
+      background: #fff2cc;
+      color: #8a6500;
+    }
+
+    .approved {
+      background: #dff5e5;
+      color: #18733b;
+    }
+
+    .rejected {
+      background: #ffe1e1;
+      color: #a52222;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+
+    .approve {
+      background: #248044;
+      color: #fff;
+    }
+
+    .reject {
+      background: #d33;
+      color: #fff;
+    }
+
+    .pending-button {
+      background: #eee;
+      color: #333;
+    }
+
+    .refresh {
+      background: #111;
+      color: #fff;
+    }
+
+    .message {
+      margin: 15px 0;
+      font-size: 14px;
+    }
+
+    .empty {
+      padding: 40px;
+      text-align: center;
+      color: #777;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        padding: 0 12px;
+      }
+
+      .dashboard {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <h1>Dice Traders — Review Admin</h1>
+  </div>
+
+  <div class="container">
+
+    <!-- LOGIN -->
+
+    <div class="login-box" id="loginBox">
+
+      <h2>Admin Login</h2>
+
+      <p>
+        Enter your private admin key to manage customer reviews.
+      </p>
+
+      <input
+        type="password"
+        id="adminKey"
+        placeholder="Enter Admin Key">
+
+      <button
+        class="login-button"
+        onclick="login()">
+
+        Login
+
+      </button>
+
+      <div
+        class="message"
+        id="loginMessage">
+      </div>
+
+    </div>
+
+
+    <!-- DASHBOARD -->
+
+    <div
+      class="dashboard"
+      id="dashboard"
+      style="display:none;">
+
+      <div class="review-top">
+
+        <div>
+          <h2>Customer Reviews</h2>
+          <p>Approve or reject customer reviews.</p>
+        </div>
+
+        <button
+          class="refresh"
+          onclick="loadReviews()">
+
+          Refresh Reviews
+
+        </button>
+
+      </div>
+
+
+      <div
+        class="stats"
+        id="stats">
+      </div>
+
+
+      <div
+        class="message"
+        id="dashboardMessage">
+      </div>
+
+
+      <div
+        id="reviews">
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <script>
+
+    let ADMIN_KEY = "";
+
+
+    // =========================================
+    // LOGIN
+    // =========================================
+
+    function login() {
+
+      const key =
+        document.getElementById("adminKey").value.trim();
+
+      if (!key) {
+
+        document.getElementById(
+          "loginMessage"
+        ).textContent =
+          "Please enter your admin key.";
+
+        return;
+      }
+
+      ADMIN_KEY = key;
+
+      loadReviews();
+
+    }
+
+
+    // =========================================
+    // LOAD REVIEWS
+    // =========================================
+
+    async function loadReviews() {
+
+      const message =
+        document.getElementById("dashboardMessage");
+
+      message.textContent =
+        "Loading reviews...";
+
+
+      try {
+
+        const response = await fetch(
+          "/api?action=admin-reviews",
+          {
+            method: "GET",
+            headers: {
+              "x-admin-key": ADMIN_KEY
+            }
+          }
+        );
+
+
+        const data =
+          await response.json();
+
+
+        if (!response.ok || !data.success) {
+
+          if (response.status === 401) {
+
+            ADMIN_KEY = "";
+
+            document.getElementById(
+              "dashboard"
+            ).style.display = "none";
+
+            document.getElementById(
+              "loginBox"
+            ).style.display = "block";
+
+            document.getElementById(
+              "loginMessage"
+            ).textContent =
+              "Invalid admin key.";
+
+            return;
+
+          }
+
+          throw new Error(
+            data.message ||
+            "Could not load reviews."
+          );
+
+        }
+
+
+        document.getElementById(
+          "loginBox"
+        ).style.display = "none";
+
+        document.getElementById(
+          "dashboard"
+        ).style.display = "block";
+
+
+        renderReviews(data.reviews);
+
+
+        message.textContent = "";
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        message.textContent =
+          error.message ||
+          "Something went wrong.";
+
+      }
+
+    }
+
+
+    // =========================================
+    // RENDER REVIEWS
+    // =========================================
+
+    function renderReviews(reviews) {
+
+      const container =
+        document.getElementById("reviews");
+
+      const stats =
+        document.getElementById("stats");
+
+
+      const pending =
+        reviews.filter(
+          r => r.status === "pending"
+        ).length;
+
+      const approved =
+        reviews.filter(
+          r => r.status === "approved"
+        ).length;
+
+      const rejected =
+        reviews.filter(
+          r => r.status === "rejected"
+        ).length;
+
+
+      stats.innerHTML = `
+
+        <div class="stat">
+          <strong>${reviews.length}</strong>
+          Total
+        </div>
+
+        <div class="stat">
+          <strong>${pending}</strong>
+          Pending
+        </div>
+
+        <div class="stat">
+          <strong>${approved}</strong>
+          Approved
+        </div>
+
+        <div class="stat">
+          <strong>${rejected}</strong>
+          Rejected
+        </div>
+
+      `;
+
+
+      if (!reviews.length) {
+
+        container.innerHTML =
+          '<div class="empty">No reviews found.</div>';
+
+        return;
+
+      }
+
+
+      container.innerHTML =
+        reviews.map(
+          function(review) {
+
+            const stars =
+              "★".repeat(review.rating) +
+              "☆".repeat(5 - review.rating);
+
+
+            const safeName =
+              escapeHtml(
+                review.customer_name
+              );
+
+            const safeText =
+              escapeHtml(
+                review.review
+              );
+
+
+            return `
+
+              <div class="review">
+
+                <div class="review-top">
+
+                  <div class="customer">
+                    ${safeName}
+                  </div>
+
+                  <div class="date">
+                    ${formatDate(review.review_date)}
+                  </div>
+
+                </div>
+
+
+                <div class="stars">
+                  ${stars}
+                </div>
+
+
+                <div class="review-text">
+                  ${safeText}
+                </div>
+
+
+                <span
+                  class="status ${review.status}">
+
+                  ${review.status}
+
+                </span>
+
+
+                <div class="actions">
+
+                  <button
+                    class="approve"
+                    onclick="updateStatus(
+                      '${review.id}',
+                      'approved'
+                    )">
+
+                    ✓ Approve
+
+                  </button>
+
+
+                  <button
+                    class="reject"
+                    onclick="updateStatus(
+                      '${review.id}',
+                      'rejected'
+                    )">
+
+                    ✕ Reject
+
+                  </button>
+
+
+                  <button
+                    class="pending-button"
+                    onclick="updateStatus(
+                      '${review.id}',
+                      'pending'
+                    )">
+
+                    ↻ Pending
+
+                  </button>
+
+                </div>
+
+              </div>
+
+            `;
+
+          }
+        ).join("");
+
+    }
+
+
+    // =========================================
+    // UPDATE STATUS
+    // =========================================
+
+    async function updateStatus(
+      reviewId,
+      status
+    ) {
+
+      if (
+        !confirm(
+          "Change this review to " +
+          status +
+          "?"
+        )
+      ) {
+        return;
+      }
+
+
+      const message =
+        document.getElementById(
+          "dashboardMessage"
+        );
+
+      message.textContent =
+        "Updating review...";
+
+
+      try {
+
+        const response =
+          await fetch(
+            "/api?action=update-status",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                "x-admin-key":
+                  ADMIN_KEY
+              },
+
+              body: JSON.stringify({
+
+                review_id:
+                  reviewId,
+
+                status:
+                  status
+
+              })
+
+            }
+          );
+
+
+        const data =
+          await response.json();
+
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+
+          throw new Error(
+            data.message ||
+            "Could not update review."
+          );
+
+        }
+
+
+        message.textContent =
+          "✓ Review updated successfully.";
+
+
+        await loadReviews();
+
+
+      } catch (error) {
+
+        console.error(error);
+
+        message.textContent =
+          error.message ||
+          "Something went wrong.";
+
+      }
+
+    }
+
+
+    // =========================================
+    // HELPERS
+    // =========================================
+
+    function escapeHtml(text) {
+
+      return String(text || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    }
+
+
+    function formatDate(date) {
+
+      if (!date) {
+        return "";
+      }
+
+      try {
+
+        return new Date(date)
+          .toLocaleDateString(
+            "en-US",
+            {
+              year: "numeric",
+              month: "short",
+              day: "numeric"
+            }
+          );
+
+      } catch (e) {
+
+        return date;
+
+      }
+
+    }
+
+  </script>
+
+</body>
+</html>
