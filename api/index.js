@@ -576,7 +576,10 @@ if (
       }
     }
   `);
-
+console.log(
+  "ADMIN REVIEWS SHOPIFY RESPONSE:",
+  JSON.stringify(reviewData, null, 2)
+);
   const reviews =
     reviewData.data.metaobjects.nodes.map(
       function(review) {
