@@ -688,6 +688,57 @@ renderReviews(data.reviews);
       }
 
     }
+    async function toggleVerified(reviewId, verified) {
+
+  const message =
+    document.getElementById("dashboardMessage");
+
+  message.textContent =
+    "Updating verification...";
+
+  try {
+
+    const response = await fetch(
+      "/api?action=update-verified",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": ADMIN_KEY
+        },
+
+        body: JSON.stringify({
+          review_id: reviewId,
+          verified: verified
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(
+        data.message ||
+        "Could not update verification."
+      );
+    }
+
+    message.textContent =
+      "✓ Verification updated successfully.";
+
+    await loadReviews();
+
+  } catch (error) {
+
+    console.error(error);
+
+    message.textContent =
+      error.message ||
+      "Something went wrong.";
+
+  }
+}
 
 
     // =========================================
