@@ -391,12 +391,13 @@
         ).style.display = "block";
 
 
-        renderReviews(
-  Array.isArray(data.reviews)
-    ? data.reviews
-    : []
-);
+      if (!Array.isArray(data.reviews)) {
+  throw new Error(
+    "API RESPONSE: " + JSON.stringify(data)
+  );
+}
 
+renderReviews(data.reviews);
 
         message.textContent = "";
 
