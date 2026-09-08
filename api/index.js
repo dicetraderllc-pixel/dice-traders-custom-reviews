@@ -534,6 +534,77 @@ export default async function handler(req, res) {
       });
     }
     // =========================================
+// GET APPROVED REVIEWS FOR STOREFRONT
+// =========================================
+
+if (
+  req.method === "GET" &&
+  req.query?.action === "storefront-reviews"
+) {
+  const productId = String(
+    req.query?.product_id || ""
+  ).trim();
+
+  if (!productId) {
+    return res.status(400).json({
+      success: false,
+      message: "Product ID is required."
+    });
+  }
+
+  const reviewData = await shopifyGraphQL(`
+    query GetStorefrontReviews {
+      metaobjects(
+        type: "$app:review"
+        first: 100
+      ) {
+        nodes {
+          id
+          fields {
+            key
+            value
+          }
+        }
+      }
+    }
+  `);
+
+  const reviews =
+    reviewData.data.metaobjects.nodes
+      .map(function(review) {
+        const fields = {};
+
+        review.fields.forEach(function(field) {
+          fields[field.key] = field.value;
+        });
+
+        return {
+          id: review.id,
+          product_id: fields.product || "",
+          customer_name: fields.customer_name || "",
+          rating: Number(fields.rating || 0),
+          review: fields.review || "",
+          review_date: fields.review_date || "",
+          status: fields.status || "pending",
+          verified: fields.verified === "true",
+          images: fields.images
+            ? JSON.parse(fields.images)
+            : []
+        };
+      })
+      .filter(function(review) {
+        return (
+          review.product_id === productId &&
+          review.status === "approved"
+        );
+      });
+
+  return res.status(200).json({
+    success: true,
+    reviews: reviews
+  });
+}
+    // =========================================
 // GET REVIEWS FOR ADMIN
 // =========================================
 
