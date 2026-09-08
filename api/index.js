@@ -93,7 +93,11 @@ export default async function handler(req, res) {
     // HEALTH CHECK
     // =========================================
 
-    if (req.method === "GET" && !req.query?.test) {
+    if (
+  req.method === "GET" &&
+  !req.query?.test &&
+  !req.query?.action
+) {
       return res.status(200).json({
         success: true,
         message: "Dice Traders Custom Reviews API is running.",
