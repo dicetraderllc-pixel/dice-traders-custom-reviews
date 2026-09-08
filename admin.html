@@ -535,7 +535,18 @@ renderReviews(data.reviews);
 
 
                 <div class="actions">
+<button
+  class="pending-button"
+  onclick="toggleVerified(
+    '${review.id}',
+    ${review.verified ? 'false' : 'true'}
+  )">
 
+  ${review.verified
+    ? '✓ Verified Buyer'
+    : '○ Not Verified'}
+
+</button>
                   <button
                     class="approve"
                     onclick="updateStatus(
