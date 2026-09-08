@@ -561,7 +561,7 @@ if (
   const reviewData = await shopifyGraphQL(`
     query GetCustomerReviews {
       metaobjects(
-        type: "$app:review"
+        type: "app--420332470273--review"
         first: 100
       ) {
         nodes {
